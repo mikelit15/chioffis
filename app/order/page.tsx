@@ -1,284 +1,458 @@
-import Hero from '@/components/Hero';
-import Link from 'next/link';
+'use client';
+
+import { useState } from 'react';
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: "Order Online - Cioffi's Italian Restaurant",
-  description: "Order authentic Italian food online from Cioffi's. Browse our menu of pizzas, pastas, entrees, and more. Pickup and delivery available in Springfield, NJ.",
+// Menu items data
+const menuCategories = [
+  {
+    name: 'Pizza',
+    items: [
+      { id: 1, name: 'Margherita Pizza', description: 'Fresh mozzarella, basil, tomato sauce', price: 14.99, image: '🍕' },
+      { id: 2, name: 'Pepperoni Pizza', description: 'Classic pepperoni with mozzarella', price: 16.99, image: '🍕' },
+      { id: 3, name: 'White Pizza', description: 'Ricotta, mozzarella, garlic, olive oil', price: 15.99, image: '🍕' },
+      { id: 4, name: 'Meat Lovers Pizza', description: 'Pepperoni, sausage, meatballs, bacon', price: 18.99, image: '🍕' },
+    ]
+  },
+  {
+    name: 'Pasta',
+    items: [
+      { id: 5, name: 'Spaghetti Carbonara', description: 'Eggs, pancetta, parmesan, black pepper', price: 16.99, image: '🍝' },
+      { id: 6, name: 'Fettuccine Alfredo', description: 'Creamy parmesan sauce', price: 15.99, image: '🍝' },
+      { id: 7, name: 'Penne Arrabbiata', description: 'Spicy tomato sauce with garlic', price: 14.99, image: '🍝' },
+      { id: 8, name: 'Lasagna', description: 'Layers of pasta, meat sauce, ricotta, mozzarella', price: 17.99, image: '🍝' },
+    ]
+  },
+  {
+    name: 'Entrees',
+    items: [
+      { id: 9, name: 'Chicken Parmigiana', description: 'Breaded chicken, marinara, mozzarella', price: 18.99, image: '🍗' },
+      { id: 10, name: 'Veal Marsala', description: 'Veal with mushroom marsala wine sauce', price: 22.99, image: '🥩' },
+      { id: 11, name: 'Eggplant Parmigiana', description: 'Breaded eggplant, marinara, mozzarella', price: 16.99, image: '🍆' },
+      { id: 12, name: 'Shrimp Scampi', description: 'Shrimp in garlic butter white wine sauce', price: 21.99, image: '🍤' },
+    ]
+  },
+  {
+    name: 'Appetizers',
+    items: [
+      { id: 13, name: 'Bruschetta', description: 'Toasted bread with tomatoes, garlic, basil', price: 8.99, image: '🥖' },
+      { id: 14, name: 'Mozzarella Sticks', description: 'Fried mozzarella with marinara sauce', price: 9.99, image: '🧀' },
+      { id: 15, name: 'Calamari Fritti', description: 'Fried calamari with lemon and marinara', price: 12.99, image: '🦑' },
+      { id: 16, name: 'Garlic Bread', description: 'Toasted bread with garlic butter', price: 6.99, image: '🥖' },
+    ]
+  },
+];
+
+type CartItem = {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
 };
 
 export default function Order() {
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState(menuCategories[0].name);
+  const [orderType, setOrderType] = useState<'pickup' | 'delivery'>('pickup');
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple' | 'google'>('card');
+
+  const addToCart = (item: { id: number; name: string; price: number }) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(cartItem => cartItem.id === item.id);
+      if (existingItem) {
+        return prevCart.map(cartItem =>
+          cartItem.id === item.id
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        );
+      }
+      return [...prevCart, { ...item, quantity: 1 }];
+    });
+  };
+
+  const removeFromCart = (id: number) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== id));
+  };
+
+  const updateQuantity = (id: number, quantity: number) => {
+    if (quantity === 0) {
+      removeFromCart(id);
+    } else {
+      setCart(prevCart =>
+        prevCart.map(item =>
+          item.id === id ? { ...item, quantity } : item
+        )
+      );
+    }
+  };
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const tax = subtotal * 0.07; // 7% tax
+  const deliveryFee = orderType === 'delivery' ? 4.99 : 0;
+  const total = subtotal + tax + deliveryFee;
+
   return (
-    <>
-      {/* Hero Section */}
-      <Hero
-        title="Order Online"
-        subtitle="Authentic Italian Food Delivered to Your Door"
-        backgroundImage="https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=2000"
-        height="medium"
-      />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-red-700 text-white py-16 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 font-serif">Order Online</h1>
+          <p className="text-xl text-red-100">Fresh Italian cuisine made to order</p>
+        </div>
+      </div>
 
-      {/* Order Options */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+      {/* Order Type Selection */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 bg-white border-b">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-6 font-serif">
-              How Would You Like to Order?
-            </h2>
-            <div className="w-24 h-1 bg-red-700 mx-auto mb-8"></div>
-            <p className="text-xl text-gray-700">
-              Choose your preferred ordering method
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Online Ordering */}
-            <div className="bg-gradient-to-br from-red-50 to-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-red-100">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-red-700 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Order Online</h3>
-                <p className="text-gray-600 mb-6">
-                  Browse our full menu and place your order online for pickup or delivery
-                </p>
-                <a
-                  href="https://www.cioffis.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                >
-                  Order Now
-                </a>
-              </div>
-            </div>
-
-            {/* Phone Order */}
-            <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Call to Order</h3>
-                <p className="text-gray-600 mb-6">
-                  Speak with our friendly staff to place your order over the phone
-                </p>
-                <a
-                  href="tel:9734675468"
-                  className="inline-block bg-gray-700 hover:bg-gray-800 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                >
-                  (973) 467-5468
-                </a>
-              </div>
-            </div>
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => setOrderType('pickup')}
+              className={`px-8 py-3 rounded-full font-semibold transition-all ${
+                orderType === 'pickup'
+                  ? 'bg-red-700 text-white shadow-lg'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              🏪 Pickup
+            </button>
+            <button
+              onClick={() => setOrderType('delivery')}
+              className={`px-8 py-3 rounded-full font-semibold transition-all ${
+                orderType === 'delivery'
+                  ? 'bg-red-700 text-white shadow-lg'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              🚗 Delivery
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Menu Preview */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+      {/* Main Content */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-6 font-serif">
-              Popular Menu Items
-            </h2>
-            <div className="w-24 h-1 bg-red-700 mx-auto mb-8"></div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Pizza */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                </svg>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Menu Section */}
+            <div className="lg:col-span-2">
+              {/* Category Tabs */}
+              <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
+                {menuCategories.map((category) => (
+                  <button
+                    key={category.name}
+                    onClick={() => setSelectedCategory(category.name)}
+                    className={`px-6 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
+                      selectedCategory === category.name
+                        ? 'bg-red-700 text-white shadow-lg'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                ))}
               </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Pizza</h3>
-                <p className="text-gray-600 mb-4">
-                  Hand-tossed pizzas with fresh mozzarella and our signature sauce
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-red-700 font-semibold">From $12.99</span>
-                </div>
+
+              {/* Menu Items */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {menuCategories
+                  .find(cat => cat.name === selectedCategory)
+                  ?.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-3xl">{item.image}</span>
+                            <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
+                          </div>
+                          <p className="text-gray-600 text-sm mb-3">{item.description}</p>
+                          <p className="text-2xl font-bold text-red-700">${item.price.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => addToCart(item)}
+                        className="w-full bg-red-700 hover:bg-red-800 text-white px-4 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105"
+                      >
+                        Add to Cart
+                      </button>
+                    </div>
+                  ))}
               </div>
             </div>
 
-            {/* Pasta */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>
-              </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Pasta</h3>
-                <p className="text-gray-600 mb-4">
-                  Traditional Italian pasta dishes made with authentic recipes
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-red-700 font-semibold">From $14.99</span>
-                </div>
-              </div>
-            </div>
+            {/* Cart Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-xl p-6 shadow-lg sticky top-24">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Order</h2>
 
-            {/* Entrees */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Entrees</h3>
-                <p className="text-gray-600 mb-4">
-                  Classic Italian entrees including chicken, veal, and seafood
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-red-700 font-semibold">From $16.99</span>
-                </div>
-              </div>
-            </div>
+                {cart.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🛒</div>
+                    <p className="text-gray-500">Your cart is empty</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Cart Items */}
+                    <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                      {cart.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 pb-4 border-b">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">{item.name}</h4>
+                            <p className="text-red-700 font-bold">${item.price.toFixed(2)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center font-bold"
+                            >
+                              −
+                            </button>
+                            <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="w-8 h-8 bg-red-700 hover:bg-red-800 text-white rounded-full flex items-center justify-center font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      ))}
+                    </div>
 
-            {/* Appetizers */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-              </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Appetizers</h3>
-                <p className="text-gray-600 mb-4">
-                  Start your meal with our delicious Italian appetizers
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-red-700 font-semibold">From $8.99</span>
-                </div>
-              </div>
-            </div>
+                    {/* Order Summary */}
+                    <div className="space-y-2 mb-6 pt-4 border-t">
+                      <div className="flex justify-between text-gray-700">
+                        <span>Subtotal</span>
+                        <span>${subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700">
+                        <span>Tax (7%)</span>
+                        <span>${tax.toFixed(2)}</span>
+                      </div>
+                      {orderType === 'delivery' && (
+                        <div className="flex justify-between text-gray-700">
+                          <span>Delivery Fee</span>
+                          <span>${deliveryFee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t">
+                        <span>Total</span>
+                        <span>${total.toFixed(2)}</span>
+                      </div>
+                    </div>
 
-            {/* Salads */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                </svg>
+                    {/* Checkout Button */}
+                    <button
+                      onClick={() => setShowCheckout(true)}
+                      className="w-full bg-red-700 hover:bg-red-800 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                    >
+                      Proceed to Checkout
+                    </button>
+                  </>
+                )}
               </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Salads</h3>
-                <p className="text-gray-600 mb-4">
-                  Fresh salads with homemade dressings and quality ingredients
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-red-700 font-semibold">From $9.99</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Desserts */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z" />
-                </svg>
-              </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Desserts</h3>
-                <p className="text-gray-600 mb-4">
-                  Finish your meal with authentic Italian desserts
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-red-700 font-semibold">From $6.99</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center mt-12">
-            <a
-              href="https://www.cioffis.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-xl"
-            >
-              View Full Menu & Order
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Delivery Info */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center font-serif">
-            Ordering Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gray-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Pickup
-              </h3>
-              <ul className="space-y-2 text-gray-600">
-                <li>• Ready in 20-30 minutes</li>
-                <li>• No minimum order</li>
-                <li>• Call ahead for faster service</li>
-                <li>• Curbside pickup available</li>
-              </ul>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                </svg>
-                Delivery
-              </h3>
-              <ul className="space-y-2 text-gray-600">
-                <li>• Delivery in 45-60 minutes</li>
-                <li>• $15 minimum order</li>
-                <li>• Delivery fee may apply</li>
-                <li>• Limited delivery area</li>
-              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-linear-to-r from-red-700 to-red-900 text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 font-serif">
-            Ready to Order?
-          </h2>
-          <p className="text-xl mb-8 text-red-100">
-            Experience authentic Italian cuisine from the comfort of your home
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="https://www.cioffis.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block bg-white text-red-700 hover:bg-gray-100 px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-xl"
+      {/* Checkout Modal */}
+      {showCheckout && cart.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-900">Checkout</h2>
+              <button
+                onClick={() => setShowCheckout(false)}
+                className="text-gray-500 hover:text-gray-700 text-3xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Customer Information */}
+            <div className="mb-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Contact Information</h3>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone Number"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Delivery Address (if delivery) */}
+            {orderType === 'delivery' && (
+              <div className="mb-8">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Delivery Address</h3>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Street Address"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="City"
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    />
+                    <input
+                      type="text"
+                      placeholder="ZIP Code"
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Method */}
+            <div className="mb-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Payment Method</h3>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <button
+                  onClick={() => setPaymentMethod('card')}
+                  className={`p-4 border-2 rounded-lg transition-all ${
+                    paymentMethod === 'card'
+                      ? 'border-red-700 bg-red-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">💳</div>
+                  <div className="font-semibold text-sm">Credit Card</div>
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('apple')}
+                  className={`p-4 border-2 rounded-lg transition-all ${
+                    paymentMethod === 'apple'
+                      ? 'border-red-700 bg-red-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">🍎</div>
+                  <div className="font-semibold text-sm">Apple Pay</div>
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('google')}
+                  className={`p-4 border-2 rounded-lg transition-all ${
+                    paymentMethod === 'google'
+                      ? 'border-red-700 bg-red-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">🔵</div>
+                  <div className="font-semibold text-sm">Google Pay</div>
+                </button>
+              </div>
+
+              {/* Card Payment Form */}
+              {paymentMethod === 'card' && (
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Card Number"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="MM/YY"
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    />
+                    <input
+                      type="text"
+                      placeholder="CVV"
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Apple Pay */}
+              {paymentMethod === 'apple' && (
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">🍎</div>
+                  <p className="text-gray-600">Click below to pay with Apple Pay</p>
+                </div>
+              )}
+
+              {/* Google Pay */}
+              {paymentMethod === 'google' && (
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">🔵</div>
+                  <p className="text-gray-600">Click below to pay with Google Pay</p>
+                </div>
+              )}
+            </div>
+
+            {/* Order Summary in Checkout */}
+            <div className="mb-8 p-6 bg-gray-50 rounded-lg">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
+              <div className="space-y-2">
+                {cart.map((item) => (
+                  <div key={item.id} className="flex justify-between text-gray-700">
+                    <span>{item.name} × {item.quantity}</span>
+                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Subtotal</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Tax</span>
+                    <span>${tax.toFixed(2)}</span>
+                  </div>
+                  {orderType === 'delivery' && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>Delivery Fee</span>
+                      <span>${deliveryFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t mt-2">
+                    <span>Total</span>
+                    <span>${total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Place Order Button */}
+            <button
+              onClick={() => {
+                alert(`Order placed! Total: $${total.toFixed(2)}\n\nThis is a demo. In production, this would process your payment and send your order to the restaurant.`);
+                setShowCheckout(false);
+                setCart([]);
+              }}
+              className="w-full bg-red-700 hover:bg-red-800 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
-              Order Online Now
-            </a>
-            <a
-              href="tel:9734675468"
-              className="inline-block bg-transparent border-2 border-white hover:bg-white/10 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300"
-            >
-              Call (973) 467-5468
-            </a>
+              Place Order - ${total.toFixed(2)}
+            </button>
           </div>
         </div>
-      </section>
-    </>
+      )}
+    </div>
   );
 }
-

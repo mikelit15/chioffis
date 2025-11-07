@@ -1,4 +1,5 @@
 import Hero from '@/components/Hero';
+import Link from 'next/link';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {

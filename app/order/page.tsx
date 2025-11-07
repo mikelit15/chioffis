@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Metadata } from 'next';
+import { loadStripe } from '@stripe/stripe-js';
 
 // Menu items data
 const menuCategories = [
@@ -50,12 +50,28 @@ type CartItem = {
   quantity: number;
 };
 
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
 export default function Order() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState(menuCategories[0].name);
   const [orderType, setOrderType] = useState<'pickup' | 'delivery'>('pickup');
   const [showCheckout, setShowCheckout] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple' | 'google'>('card');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Form state
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
+
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    street: '',
+    city: '',
+    zip: '',
+  });
 
   const addToCart = (item: { id: number; name: string; price: number }) => {
     setCart(prevCart => {
@@ -91,6 +107,53 @@ export default function Order() {
   const tax = subtotal * 0.07; // 7% tax
   const deliveryFee = orderType === 'delivery' ? 4.99 : 0;
   const total = subtotal + tax + deliveryFee;
+
+  // Handle Stripe Checkout
+  const handleCheckout = async () => {
+    // Validate form
+    if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
+      alert('Please fill in all contact information');
+      return;
+    }
+
+    if (orderType === 'delivery' && (!deliveryAddress.street || !deliveryAddress.city || !deliveryAddress.zip)) {
+      alert('Please fill in delivery address');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Create checkout session
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: cart,
+          orderType,
+          customerInfo,
+          deliveryAddress: orderType === 'delivery' ? deliveryAddress : null,
+        }),
+      });
+
+      const { sessionId, url, error } = await response.json();
+
+      if (error) {
+        throw new Error(error);
+      }
+
+      // Redirect to Stripe Checkout
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      alert('Failed to process checkout. Please try again.');
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -286,17 +349,26 @@ export default function Order() {
                 <input
                   type="text"
                   placeholder="Full Name"
+                  value={customerInfo.name}
+                  onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                  required
                 />
                 <input
                   type="email"
                   placeholder="Email"
+                  value={customerInfo.email}
+                  onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                  required
                 />
                 <input
                   type="tel"
                   placeholder="Phone Number"
+                  value={customerInfo.phone}
+                  onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                  required
                 />
               </div>
             </div>
@@ -309,101 +381,50 @@ export default function Order() {
                   <input
                     type="text"
                     placeholder="Street Address"
+                    value={deliveryAddress.street}
+                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    required
                   />
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       type="text"
                       placeholder="City"
+                      value={deliveryAddress.city}
+                      onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
                       className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
                     />
                     <input
                       type="text"
                       placeholder="ZIP Code"
+                      value={deliveryAddress.zip}
+                      onChange={(e) => setDeliveryAddress({ ...deliveryAddress, zip: e.target.value })}
                       className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
                     />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Payment Method */}
-            <div className="mb-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Payment Method</h3>
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <button
-                  onClick={() => setPaymentMethod('card')}
-                  className={`p-4 border-2 rounded-lg transition-all ${
-                    paymentMethod === 'card'
-                      ? 'border-red-700 bg-red-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-3xl mb-2">💳</div>
-                  <div className="font-semibold text-sm">Credit Card</div>
-                </button>
-                <button
-                  onClick={() => setPaymentMethod('apple')}
-                  className={`p-4 border-2 rounded-lg transition-all ${
-                    paymentMethod === 'apple'
-                      ? 'border-red-700 bg-red-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-3xl mb-2">🍎</div>
-                  <div className="font-semibold text-sm">Apple Pay</div>
-                </button>
-                <button
-                  onClick={() => setPaymentMethod('google')}
-                  className={`p-4 border-2 rounded-lg transition-all ${
-                    paymentMethod === 'google'
-                      ? 'border-red-700 bg-red-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-3xl mb-2">🔵</div>
-                  <div className="font-semibold text-sm">Google Pay</div>
-                </button>
-              </div>
-
-              {/* Card Payment Form */}
-              {paymentMethod === 'card' && (
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Card Number"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      placeholder="CVV"
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                    />
+            {/* Payment Info */}
+            <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">🔒</div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2">Secure Payment with Stripe</h3>
+                  <p className="text-sm text-gray-600 mb-2">
+                    You&apos;ll be redirected to Stripe&apos;s secure checkout page to complete your payment.
+                  </p>
+                  <div className="flex gap-2 text-2xl">
+                    💳 🍎 🔵
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Accepts all major credit cards, Apple Pay, and Google Pay
+                  </p>
                 </div>
-              )}
-
-              {/* Apple Pay */}
-              {paymentMethod === 'apple' && (
-                <div className="text-center py-8">
-                  <div className="text-6xl mb-4">🍎</div>
-                  <p className="text-gray-600">Click below to pay with Apple Pay</p>
-                </div>
-              )}
-
-              {/* Google Pay */}
-              {paymentMethod === 'google' && (
-                <div className="text-center py-8">
-                  <div className="text-6xl mb-4">🔵</div>
-                  <p className="text-gray-600">Click below to pay with Google Pay</p>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Order Summary in Checkout */}
@@ -441,14 +462,21 @@ export default function Order() {
 
             {/* Place Order Button */}
             <button
-              onClick={() => {
-                alert(`Order placed! Total: $${total.toFixed(2)}\n\nThis is a demo. In production, this would process your payment and send your order to the restaurant.`);
-                setShowCheckout(false);
-                setCart([]);
-              }}
-              className="w-full bg-red-700 hover:bg-red-800 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+              onClick={handleCheckout}
+              disabled={isProcessing}
+              className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
-              Place Order - ${total.toFixed(2)}
+              {isProcessing ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                `Proceed to Payment - $${total.toFixed(2)}`
+              )}
             </button>
           </div>
         </div>

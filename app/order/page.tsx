@@ -334,17 +334,11 @@ export default function Order() {
   const deliveryFee = orderType === 'delivery' ? 4.99 : 0;
   const total = subtotal + tax + deliveryFee;
 
-  // Handle opening checkout modal
-  const handleOpenCheckout = async () => {
+  // Handle opening checkout modal - just open it, don't create payment intent yet
+  const handleOpenCheckout = () => {
     // Validate cart
     if (cart.length === 0) {
       alert('Your cart is empty');
-      return;
-    }
-
-    // Validate form
-    if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
-      alert('Please fill in all contact information');
       return;
     }
 
@@ -355,6 +349,17 @@ export default function Order() {
 
     if (orderType === 'pickup' && pickupTime === 'later' && (!scheduledDate || !scheduledTime)) {
       alert('Please select pickup date and time');
+      return;
+    }
+
+    setShowCheckout(true);
+  };
+
+  // Handle creating payment intent after contact info is filled
+  const handleCreatePaymentIntent = async () => {
+    // Validate form
+    if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
+      alert('Please fill in all contact information');
       return;
     }
 
@@ -380,18 +385,19 @@ export default function Order() {
         }),
       });
 
-      const { clientSecret, error } = await response.json();
+      const data = await response.json();
 
-      if (error) {
-        throw new Error(error);
+      if (data.error) {
+        alert(`Payment Error: ${data.error}\n\nNote: If Stripe is not configured, payment processing will not work. Please add your Stripe API keys to continue.`);
+        setIsProcessing(false);
+        return;
       }
 
-      setClientSecret(clientSecret);
-      setShowCheckout(true);
+      setClientSecret(data.clientSecret);
+      setIsProcessing(false);
     } catch (error: any) {
-      console.error('Checkout error:', error);
-      alert('Failed to initialize payment. Please try again.');
-    } finally {
+      console.error('Error creating payment intent:', error);
+      alert('Failed to initialize payment. Please try again.\n\nIf this persists, Stripe may not be configured properly.');
       setIsProcessing(false);
     }
   };
@@ -653,42 +659,12 @@ export default function Order() {
                       </div>
                     </div>
 
-                    {/* Contact Information Form */}
-                    <div className="mb-6 space-y-3">
-                      <h3 className="font-bold text-gray-900">Contact Info</h3>
-                      <input
-                        type="text"
-                        placeholder="Full Name"
-                        value={customerInfo.name}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
-                        required
-                      />
-                      <input
-                        type="email"
-                        placeholder="Email"
-                        value={customerInfo.email}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
-                        required
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Phone"
-                        value={customerInfo.phone}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
-                        required
-                      />
-                    </div>
-
                     {/* Checkout Button */}
                     <button
                       onClick={handleOpenCheckout}
-                      disabled={isProcessing}
-                      className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                      className="w-full bg-red-700 hover:bg-red-800 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
                     >
-                      {isProcessing ? 'Loading...' : 'Proceed to Checkout'}
+                      Proceed to Checkout
                     </button>
                   </>
                 )}
@@ -699,11 +675,11 @@ export default function Order() {
       </section>
 
       {/* Checkout Modal */}
-      {showCheckout && cart.length > 0 && clientSecret && (
+      {showCheckout && cart.length > 0 && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full my-8 p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Complete Payment</h2>
+              <h2 className="text-3xl font-bold text-gray-900">{clientSecret ? 'Complete Payment' : 'Checkout'}</h2>
               <button
                 onClick={() => {
                   setShowCheckout(false);
@@ -715,73 +691,148 @@ export default function Order() {
               </button>
             </div>
 
-            {/* Order Summary */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-bold text-gray-900 mb-3">Order Summary</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Order Type:</span>
-                  <span className="font-semibold">{orderType === 'pickup' ? '🏪 Pickup' : '🚗 Delivery'}</span>
-                </div>
-                {orderType === 'pickup' && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Pickup Time:</span>
-                    <span className="font-semibold">
-                      {pickupTime === 'asap' ? 'ASAP (20-30 min)' : `${scheduledDate} at ${scheduledTime}`}
-                    </span>
+            {!clientSecret ? (
+              <>
+                {/* Contact Information Form */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Contact Information</h3>
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      placeholder="Full Name *"
+                      value={customerInfo.name}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email *"
+                      value={customerInfo.email}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Phone Number *"
+                      value={customerInfo.phone}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
+                    />
                   </div>
-                )}
-                {orderType === 'delivery' && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Delivery To:</span>
-                    <span className="font-semibold text-right">
-                      {deliveryAddress.street}, {deliveryAddress.city}, {deliveryAddress.state} {deliveryAddress.zip}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between pt-2 border-t">
-                  <span className="text-gray-600">Contact:</span>
-                  <span className="font-semibold">{customerInfo.name}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Email:</span>
-                  <span className="font-semibold">{customerInfo.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Phone:</span>
-                  <span className="font-semibold">{customerInfo.phone}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t font-bold text-lg">
-                  <span>Total:</span>
-                  <span className="text-red-700">${total.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Items in Order */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-bold text-gray-900 mb-3">Items</h3>
-              <div className="space-y-2 text-sm">
-                {cart.map((item) => (
-                  <div key={item.id} className="flex justify-between text-gray-700">
-                    <span>{item.name} × {item.quantity}</span>
-                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                {/* Order Summary */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-bold text-gray-900 mb-3">Order Summary</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Order Type:</span>
+                      <span className="font-semibold">{orderType === 'pickup' ? '🏪 Pickup' : '🚗 Delivery'}</span>
+                    </div>
+                    {orderType === 'pickup' && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Pickup Time:</span>
+                        <span className="font-semibold">
+                          {pickupTime === 'asap' ? 'ASAP (20-30 min)' : `${scheduledDate} at ${scheduledTime}`}
+                        </span>
+                      </div>
+                    )}
+                    {orderType === 'delivery' && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Delivery To:</span>
+                        <span className="font-semibold text-right">
+                          {deliveryAddress.street}, {deliveryAddress.city}, {deliveryAddress.state} {deliveryAddress.zip}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Stripe Elements Payment Form */}
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <CheckoutForm
-                total={total}
-                onSuccess={() => {
-                  setCart([]);
-                  setShowCheckout(false);
-                  setClientSecret('');
-                }}
-              />
-            </Elements>
+                {/* Items in Order */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-bold text-gray-900 mb-3">Items ({cart.length})</h3>
+                  <div className="space-y-2 text-sm max-h-48 overflow-y-auto">
+                    {cart.map((item) => (
+                      <div key={item.id} className="flex justify-between text-gray-700">
+                        <span>{item.name} × {item.quantity}</span>
+                        <span>${(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 pt-4 border-t space-y-2">
+                    <div className="flex justify-between text-gray-700">
+                      <span>Subtotal</span>
+                      <span>${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Tax (7%)</span>
+                      <span>${tax.toFixed(2)}</span>
+                    </div>
+                    {orderType === 'delivery' && (
+                      <div className="flex justify-between text-gray-700">
+                        <span>Delivery Fee</span>
+                        <span>${deliveryFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                      <span>Total:</span>
+                      <span className="text-red-700">${total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Proceed to Payment Button */}
+                <button
+                  onClick={handleCreatePaymentIntent}
+                  disabled={isProcessing}
+                  className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 shadow-lg"
+                >
+                  {isProcessing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Initializing Payment...
+                    </span>
+                  ) : (
+                    `Proceed to Payment - $${total.toFixed(2)}`
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Order Summary - Compact */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-bold text-gray-900 mb-3">Order Summary</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Contact:</span>
+                      <span className="font-semibold">{customerInfo.name} • {customerInfo.phone}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                      <span>Total:</span>
+                      <span className="text-red-700">${total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stripe Elements Payment Form */}
+                <Elements stripe={stripePromise} options={{ clientSecret }}>
+                  <CheckoutForm
+                    total={total}
+                    onSuccess={() => {
+                      setCart([]);
+                      setShowCheckout(false);
+                      setClientSecret('');
+                    }}
+                  />
+                </Elements>
+              </>
+            )}
           </div>
         </div>
       )}

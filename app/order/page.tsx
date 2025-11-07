@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { useRouter } from 'next/navigation';
 
 // Menu items data
 const menuCategories = [
@@ -53,6 +55,95 @@ type CartItem = {
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
+// Checkout Form Component
+function CheckoutForm({ total, onSuccess }: { total: number; onSuccess: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const router = useRouter();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage('');
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/order/success`,
+        },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        setErrorMessage(error.message || 'Payment failed');
+        setIsProcessing(false);
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Payment successful
+        onSuccess();
+        router.push('/order/success');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'An error occurred');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Stripe Payment Element */}
+      <div className="mb-6">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Payment Information</h3>
+        <div className="p-4 border border-gray-300 rounded-lg bg-white">
+          <PaymentElement />
+        </div>
+      </div>
+
+      {errorMessage && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={!stripe || isProcessing}
+        className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+      >
+        {isProcessing ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Processing Payment...
+          </span>
+        ) : (
+          `Pay $${total.toFixed(2)}`
+        )}
+      </button>
+
+      <div className="text-center text-sm text-gray-500">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+          </svg>
+          Secure payment powered by Stripe
+        </div>
+        <p>Supports all major credit cards, Apple Pay, and Google Pay</p>
+      </div>
+    </form>
+  );
+}
+
 export default function Order() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState(menuCategories[0].name);
@@ -70,8 +161,17 @@ export default function Order() {
   const [deliveryAddress, setDeliveryAddress] = useState({
     street: '',
     city: '',
+    state: '',
     zip: '',
   });
+
+  // Pickup time state
+  const [pickupTime, setPickupTime] = useState<'asap' | 'later'>('asap');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+
+  // Stripe state
+  const [clientSecret, setClientSecret] = useState('');
 
   const addToCart = (item: { id: number; name: string; price: number }) => {
     setCart(prevCart => {
@@ -108,49 +208,64 @@ export default function Order() {
   const deliveryFee = orderType === 'delivery' ? 4.99 : 0;
   const total = subtotal + tax + deliveryFee;
 
-  // Handle Stripe Checkout
-  const handleCheckout = async () => {
+  // Handle opening checkout modal
+  const handleOpenCheckout = async () => {
+    // Validate cart
+    if (cart.length === 0) {
+      alert('Your cart is empty');
+      return;
+    }
+
     // Validate form
     if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
       alert('Please fill in all contact information');
       return;
     }
 
-    if (orderType === 'delivery' && (!deliveryAddress.street || !deliveryAddress.city || !deliveryAddress.zip)) {
-      alert('Please fill in delivery address');
+    if (orderType === 'delivery' && (!deliveryAddress.street || !deliveryAddress.city || !deliveryAddress.state || !deliveryAddress.zip)) {
+      alert('Please fill in complete delivery address');
+      return;
+    }
+
+    if (orderType === 'pickup' && pickupTime === 'later' && (!scheduledDate || !scheduledTime)) {
+      alert('Please select pickup date and time');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Create checkout session
-      const response = await fetch('/api/create-checkout-session', {
+      // Create payment intent
+      const response = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          items: cart,
-          orderType,
+          amount: total,
           customerInfo,
+          orderType,
           deliveryAddress: orderType === 'delivery' ? deliveryAddress : null,
+          pickupTime: orderType === 'pickup' ? {
+            type: pickupTime,
+            date: scheduledDate,
+            time: scheduledTime,
+          } : null,
         }),
       });
 
-      const { sessionId, url, error } = await response.json();
+      const { clientSecret, error } = await response.json();
 
       if (error) {
         throw new Error(error);
       }
 
-      // Redirect to Stripe Checkout
-      if (url) {
-        window.location.href = url;
-      }
+      setClientSecret(clientSecret);
+      setShowCheckout(true);
     } catch (error: any) {
       console.error('Checkout error:', error);
-      alert('Failed to process checkout. Please try again.');
+      alert('Failed to initialize payment. Please try again.');
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -168,7 +283,7 @@ export default function Order() {
       {/* Order Type Selection */}
       <section className="py-8 px-4 sm:px-6 lg:px-8 bg-white border-b">
         <div className="max-w-7xl mx-auto">
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-4 mb-6">
             <button
               onClick={() => setOrderType('pickup')}
               className={`px-8 py-3 rounded-full font-semibold transition-all ${
@@ -190,6 +305,105 @@ export default function Order() {
               🚗 Delivery
             </button>
           </div>
+
+          {/* Pickup Time Selection */}
+          {orderType === 'pickup' && (
+            <div className="max-w-2xl mx-auto">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">When would you like to pick up?</h3>
+              <div className="flex gap-4 mb-4">
+                <button
+                  onClick={() => setPickupTime('asap')}
+                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                    pickupTime === 'asap'
+                      ? 'bg-red-700 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  ⚡ ASAP (20-30 min)
+                </button>
+                <button
+                  onClick={() => setPickupTime('later')}
+                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                    pickupTime === 'later'
+                      ? 'bg-red-700 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  📅 Schedule for Later
+                </button>
+              </div>
+
+              {pickupTime === 'later' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={scheduledDate}
+                      onChange={(e) => setScheduledDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                    <input
+                      type="time"
+                      value={scheduledTime}
+                      onChange={(e) => setScheduledTime(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Delivery Address */}
+          {orderType === 'delivery' && (
+            <div className="max-w-2xl mx-auto">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Delivery Address</h3>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Street Address"
+                  value={deliveryAddress.street}
+                  onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                  required
+                />
+                <div className="grid grid-cols-3 gap-4">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={deliveryAddress.city}
+                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    value={deliveryAddress.state}
+                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, state: e.target.value })}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    maxLength={2}
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="ZIP"
+                    value={deliveryAddress.zip}
+                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, zip: e.target.value })}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -313,12 +527,42 @@ export default function Order() {
                       </div>
                     </div>
 
+                    {/* Contact Information Form */}
+                    <div className="mb-6 space-y-3">
+                      <h3 className="font-bold text-gray-900">Contact Info</h3>
+                      <input
+                        type="text"
+                        placeholder="Full Name"
+                        value={customerInfo.name}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
+                        required
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={customerInfo.email}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
+                        required
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Phone"
+                        value={customerInfo.phone}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
+                        required
+                      />
+                    </div>
+
                     {/* Checkout Button */}
                     <button
-                      onClick={() => setShowCheckout(true)}
-                      className="w-full bg-red-700 hover:bg-red-800 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                      onClick={handleOpenCheckout}
+                      disabled={isProcessing}
+                      className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
                     >
-                      Proceed to Checkout
+                      {isProcessing ? 'Loading...' : 'Proceed to Checkout'}
                     </button>
                   </>
                 )}
@@ -329,155 +573,89 @@ export default function Order() {
       </section>
 
       {/* Checkout Modal */}
-      {showCheckout && cart.length > 0 && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+      {showCheckout && cart.length > 0 && clientSecret && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full my-8 p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Checkout</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Complete Payment</h2>
               <button
-                onClick={() => setShowCheckout(false)}
+                onClick={() => {
+                  setShowCheckout(false);
+                  setClientSecret('');
+                }}
                 className="text-gray-500 hover:text-gray-700 text-3xl"
               >
                 ×
               </button>
             </div>
 
-            {/* Customer Information */}
-            <div className="mb-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Contact Information</h3>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  value={customerInfo.name}
-                  onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                  required
-                />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={customerInfo.email}
-                  onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                  required
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  value={customerInfo.phone}
-                  onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Delivery Address (if delivery) */}
-            {orderType === 'delivery' && (
-              <div className="mb-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Delivery Address</h3>
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Street Address"
-                    value={deliveryAddress.street}
-                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                    required
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder="City"
-                      value={deliveryAddress.city}
-                      onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="ZIP Code"
-                      value={deliveryAddress.zip}
-                      onChange={(e) => setDeliveryAddress({ ...deliveryAddress, zip: e.target.value })}
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                      required
-                    />
-                  </div>
+            {/* Order Summary */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-bold text-gray-900 mb-3">Order Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Order Type:</span>
+                  <span className="font-semibold">{orderType === 'pickup' ? '🏪 Pickup' : '🚗 Delivery'}</span>
                 </div>
-              </div>
-            )}
-
-            {/* Payment Info */}
-            <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🔒</div>
-                <div>
-                  <h3 className="font-bold text-gray-900 mb-2">Secure Payment with Stripe</h3>
-                  <p className="text-sm text-gray-600 mb-2">
-                    You&apos;ll be redirected to Stripe&apos;s secure checkout page to complete your payment.
-                  </p>
-                  <div className="flex gap-2 text-2xl">
-                    💳 🍎 🔵
+                {orderType === 'pickup' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Pickup Time:</span>
+                    <span className="font-semibold">
+                      {pickupTime === 'asap' ? 'ASAP (20-30 min)' : `${scheduledDate} at ${scheduledTime}`}
+                    </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Accepts all major credit cards, Apple Pay, and Google Pay
-                  </p>
+                )}
+                {orderType === 'delivery' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Delivery To:</span>
+                    <span className="font-semibold text-right">
+                      {deliveryAddress.street}, {deliveryAddress.city}, {deliveryAddress.state} {deliveryAddress.zip}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t">
+                  <span className="text-gray-600">Contact:</span>
+                  <span className="font-semibold">{customerInfo.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="font-semibold">{customerInfo.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Phone:</span>
+                  <span className="font-semibold">{customerInfo.phone}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                  <span>Total:</span>
+                  <span className="text-red-700">${total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Order Summary in Checkout */}
-            <div className="mb-8 p-6 bg-gray-50 rounded-lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
-              <div className="space-y-2">
+            {/* Items in Order */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-bold text-gray-900 mb-3">Items</h3>
+              <div className="space-y-2 text-sm">
                 {cart.map((item) => (
                   <div key={item.id} className="flex justify-between text-gray-700">
                     <span>{item.name} × {item.quantity}</span>
                     <span>${(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
-                <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between text-gray-700">
-                    <span>Subtotal</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-700">
-                    <span>Tax</span>
-                    <span>${tax.toFixed(2)}</span>
-                  </div>
-                  {orderType === 'delivery' && (
-                    <div className="flex justify-between text-gray-700">
-                      <span>Delivery Fee</span>
-                      <span>${deliveryFee.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t mt-2">
-                    <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Place Order Button */}
-            <button
-              onClick={handleCheckout}
-              disabled={isProcessing}
-              className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-            >
-              {isProcessing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
-                </span>
-              ) : (
-                `Proceed to Payment - $${total.toFixed(2)}`
-              )}
-            </button>
+            {/* Stripe Elements Payment Form */}
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <CheckoutForm
+                total={total}
+                onSuccess={() => {
+                  setCart([]);
+                  setShowCheckout(false);
+                  setClientSecret('');
+                }}
+              />
+            </Elements>
           </div>
         </div>
       )}

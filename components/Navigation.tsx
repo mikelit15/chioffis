@@ -18,6 +18,7 @@ export default function Navigation() {
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/our-story', label: 'Our Story' },
+    { href: '/order', label: 'Menu' },
     { href: '/catering', label: 'Catering' },
     { href: '/contact', label: 'Contact' },
   ];

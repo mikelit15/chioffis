@@ -56,14 +56,12 @@ export default function Navigation() {
                 {link.label}
               </Link>
             ))}
-            <a
-              href="https://www.cioffis.com"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/order"
               className="bg-red-700 hover:bg-red-800 text-white px-6 py-2.5 rounded-full font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               Order Online
-            </a>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -112,14 +110,13 @@ export default function Navigation() {
               {link.label}
             </Link>
           ))}
-          <a
-            href="https://www.cioffis.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/order"
             className="block bg-red-700 hover:bg-red-800 text-white px-6 py-3 rounded-full font-medium text-center transition-all duration-300"
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Order Online
-          </a>
+          </Link>
         </div>
       </div>
     </nav>

@@ -133,14 +133,12 @@ export default function Contact() {
               <p className="text-gray-600 mb-6">
                 Browse our menu and place your order for pickup or delivery
               </p>
-              <a
-                href="https://www.cioffis.com"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/order"
                 className="inline-block bg-red-700 hover:bg-red-800 text-white px-6 py-3 rounded-full font-semibold transition-all duration-300"
               >
                 Order Now
-              </a>
+              </Link>
             </div>
 
             {/* Catering */}

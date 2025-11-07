@@ -11,14 +11,12 @@ export default function Home() {
         backgroundImage="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2000"
       >
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <a
-            href="https://www.cioffis.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/order"
             className="bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-xl"
           >
             Order Online
-          </a>
+          </Link>
           <Link
             href="/contact"
             className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white border-2 border-white px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300"

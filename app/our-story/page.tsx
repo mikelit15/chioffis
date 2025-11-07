@@ -156,14 +156,12 @@ export default function OurStory() {
           <p className="text-xl mb-8 text-red-100">
             Experience over 65 years of Italian culinary tradition
           </p>
-          <a
-            href="https://www.cioffis.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/order"
             className="inline-block bg-white text-red-700 hover:bg-gray-100 px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-xl"
           >
             Order Online
-          </a>
+          </Link>
         </div>
       </section>
     </>

@@ -676,16 +676,16 @@ export default function Order() {
 
       {/* Checkout Modal */}
       {showCheckout && cart.length > 0 && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full my-8 p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">{clientSecret ? 'Complete Payment' : 'Checkout'}</h2>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">{clientSecret ? 'Complete Payment' : 'Checkout'}</h2>
               <button
                 onClick={() => {
                   setShowCheckout(false);
                   setClientSecret('');
                 }}
-                className="text-gray-500 hover:text-gray-700 text-3xl"
+                className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
               >
                 ×
               </button>
@@ -694,15 +694,15 @@ export default function Order() {
             {!clientSecret ? (
               <>
                 {/* Contact Information Form */}
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Contact Information</h3>
-                  <div className="space-y-4">
+                <div className="mb-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Contact Information</h3>
+                  <div className="space-y-3">
                     <input
                       type="text"
                       placeholder="Full Name *"
                       value={customerInfo.name}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
                       required
                     />
                     <input
@@ -710,7 +710,7 @@ export default function Order() {
                       placeholder="Email *"
                       value={customerInfo.email}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
                       required
                     />
                     <input
@@ -718,16 +718,16 @@ export default function Order() {
                       placeholder="Phone Number *"
                       value={customerInfo.phone}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
                       required
                     />
                   </div>
                 </div>
 
                 {/* Order Summary */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-bold text-gray-900 mb-3">Order Summary</h3>
-                  <div className="space-y-2 text-sm">
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <h3 className="font-bold text-gray-900 mb-2 text-sm">Order Summary</h3>
+                  <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Order Type:</span>
                       <span className="font-semibold">{orderType === 'pickup' ? '🏪 Pickup' : '🚗 Delivery'}</span>
@@ -735,7 +735,7 @@ export default function Order() {
                     {orderType === 'pickup' && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Pickup Time:</span>
-                        <span className="font-semibold">
+                        <span className="font-semibold text-right text-xs">
                           {pickupTime === 'asap' ? 'ASAP (20-30 min)' : `${scheduledDate} at ${scheduledTime}`}
                         </span>
                       </div>
@@ -743,7 +743,7 @@ export default function Order() {
                     {orderType === 'delivery' && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Delivery To:</span>
-                        <span className="font-semibold text-right">
+                        <span className="font-semibold text-right text-xs">
                           {deliveryAddress.street}, {deliveryAddress.city}, {deliveryAddress.state} {deliveryAddress.zip}
                         </span>
                       </div>
@@ -752,32 +752,32 @@ export default function Order() {
                 </div>
 
                 {/* Items in Order */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-bold text-gray-900 mb-3">Items ({cart.length})</h3>
-                  <div className="space-y-2 text-sm max-h-48 overflow-y-auto">
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <h3 className="font-bold text-gray-900 mb-2 text-sm">Items ({cart.length})</h3>
+                  <div className="space-y-1 text-xs max-h-32 overflow-y-auto">
                     {cart.map((item) => (
                       <div key={item.id} className="flex justify-between text-gray-700">
-                        <span>{item.name} × {item.quantity}</span>
-                        <span>${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="truncate mr-2">{item.name} × {item.quantity}</span>
+                        <span className="whitespace-nowrap">${(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 pt-4 border-t space-y-2">
-                    <div className="flex justify-between text-gray-700">
+                  <div className="mt-3 pt-3 border-t space-y-1">
+                    <div className="flex justify-between text-gray-700 text-xs">
                       <span>Subtotal</span>
                       <span>${subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-gray-700">
+                    <div className="flex justify-between text-gray-700 text-xs">
                       <span>Tax (7%)</span>
                       <span>${tax.toFixed(2)}</span>
                     </div>
                     {orderType === 'delivery' && (
-                      <div className="flex justify-between text-gray-700">
+                      <div className="flex justify-between text-gray-700 text-xs">
                         <span>Delivery Fee</span>
                         <span>${deliveryFee.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                    <div className="flex justify-between pt-2 border-t font-bold text-base">
                       <span>Total:</span>
                       <span className="text-red-700">${total.toFixed(2)}</span>
                     </div>
@@ -788,11 +788,11 @@ export default function Order() {
                 <button
                   onClick={handleCreatePaymentIntent}
                   disabled={isProcessing}
-                  className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-300 shadow-lg"
+                  className="w-full bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg font-bold transition-all duration-300 shadow-lg"
                 >
                   {isProcessing ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <span className="flex items-center justify-center gap-2 text-sm">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
@@ -806,14 +806,14 @@ export default function Order() {
             ) : (
               <>
                 {/* Order Summary - Compact */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-bold text-gray-900 mb-3">Order Summary</h3>
-                  <div className="space-y-2 text-sm">
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <h3 className="font-bold text-gray-900 mb-2 text-sm">Order Summary</h3>
+                  <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Contact:</span>
                       <span className="font-semibold">{customerInfo.name} • {customerInfo.phone}</span>
                     </div>
-                    <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                    <div className="flex justify-between pt-2 border-t font-bold text-base">
                       <span>Total:</span>
                       <span className="text-red-700">${total.toFixed(2)}</span>
                     </div>
